@@ -56,7 +56,7 @@ PAYEMENT_METHOD = (
 )
 
 
-# Person
+# ####### Persons section #######
 class Person(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     user_name = models.CharField(max_length=255, blank=True, null=True),
@@ -67,6 +67,8 @@ class Person(models.Model):
     born = models.DateTimeField(blank=True, null=True)
     total_amount = models.IntegerField(default=0)
     country = CountryField(blank=True)
+    notifications = models.ManyToManyField('Notification', related_name="all_person_notifications", blank=True)
+    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_person_not_opened", blank=True)
 
     def __str__(self):
         return self.user.username
@@ -88,7 +90,8 @@ class Media(models.Model):
         return f"{self.file_name}"
 
 
-# market
+
+# ####### Markets section #######
 class Item(models.Model):
     title = models.CharField(max_length=255)
     profils = models.ForeignKey(Profil, on_delete=models.CASCADE, blank=True, null=True)
@@ -102,7 +105,7 @@ class Item(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     stock = models.IntegerField(default=1)
     item_state = models.CharField(max_length=2, choices=ITEM_STATE, default='nw')
-
+    resellable = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.title} created at {self.created}"
@@ -143,14 +146,21 @@ class Factor(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, blank=True, null=True)
     profil = models.ForeignKey('Profil', on_delete=models.CASCADE, blank=True, null=True)
     title = models.CharField(max_length=255)
+    certified = models.BooleanField(default=False)
     description = models.TextField(blank=True, null=True)
     address = models.CharField(max_length=255)
     slug = models.SlugField(editable=False, unique=True)
     items = models.ManyToManyField(Item, blank=True)
     transaction_done = models.ManyToManyField(Transaction, blank=True)
     clients_saved = models.ManyToManyField('Client', blank=True)
-    followers = models.ManyToManyField('Client', related_name='followers')
+    followers = models.ManyToManyField('Client', related_name='followers', blank=True)
     total_amount = models.IntegerField(default=0)
+    collab_asked = models.ManyToManyField('Factor', related_name='collaboration_asked', blank=True)
+    collab_received = models.ManyToManyField('Factor', related_name='collaboration_received', blank=True)
+    collaborators = models.ManyToManyField('Factor', related_name='own_collaborators', blank=True)
+    collaborations = models.ManyToManyField('Collaboration', blank=True)
+    notifications = models.ManyToManyField('Notification', related_name="all_factor_notifications", blank=True)
+    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_factor_not_opened", blank=True)
 
     def __str__(self):
         return f"{self.title} owner by {self.person.user.username}"
@@ -180,6 +190,44 @@ class Client(models.Model):
         return total
 
 
+
+# ####### collaborations section #######
+class Collaboration(models.Model):
+    factor_asker = models.ForeignKey(Factor, on_delete=models.CASCADE)
+    collab_items = models.ManyToManyField('CollabItem')
+    collab_date = models.DateTimeField(auto_now_add=True)
+    activated = models.BooleanField(default=True)
+    percent = models.FloatField(default=15.0)
+
+    def __str__(self):
+        return f"collaboration with {self.factor_asker.title} has {self.collab_items.count()} items."
+
+
+class CollabItem(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    price_collab = models.FloatField(blank=True, null=True)
+    stock_collab = models.IntegerField(blank=True, null=True)
+    percent_item = models.FloatField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.stock_collab} {self.item.title} in stock at {self.price_collab}"
+
+
+
+# ####### Notifications section #######
+class Notification(models.Model):
+    message = models.TextField()
+    opened = models.BooleanField(default=False)
+    pub_date = models.DateTimeField(auto_now_add=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, blank=True, null=True)
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, blank=True, null=True)
+    factor = models.ForeignKey(Factor, on_delete=models.CASCADE, blank=True, null=True)
+
+    def __str__(self):
+        return f"'{self.message}' sent at {self.pub_date} with transaction: {self.transaction} and item: {self.item}"
+
+
+# ####### Tries section #######
 class Try(models.Model):
     title = models.CharField(max_length=255)
     the_file = models.ImageField(upload_to='try-only/images', null=True, blank=True)

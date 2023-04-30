@@ -58,6 +58,19 @@ class ExchangeSerializers(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = "__all__"
+
+
+
+class CollaborationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collaboration
+        fields = "__all__"
+
+
 class TrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Try

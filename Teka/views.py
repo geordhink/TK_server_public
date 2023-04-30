@@ -23,9 +23,10 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 
-# registration and login
+# # ####### registration and login section #######
 class RegisterUser(APIView):
     def get(self, request):
         all_users = User.objects.all()
@@ -49,7 +50,7 @@ class RegisterUser(APIView):
         return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
 
 
-# global viewsets
+# ####### globals viewsets section #######
 class PersonsViewSet(ModelViewSet):
     serializer_class = PersonSerializer
     queryset = Person.objects.all()
@@ -91,18 +92,22 @@ class UserModelViewSet(ModelViewSet):
     queryset = User.objects.all()
 
 
-# /end global viewsets
+class NotificationViewSet(ModelViewSet):
+    serializer_class = NotificationSerializer
+    queryset = Notification.objects.order_by('-pub_date')
 
-# facebook registration
+
+class CollaborationViewSet(ModelViewSet):
+    serializer_class = CollaborationSerializer
+    queryset = Collaboration.objects.order_by('-collab_date')
+
+
+# ####### social networks registration section #######
 class FacebookLogin(SocialLoginView):
     adapter_class = FacebookOAuth2Adapter
 
 
-# /end facebook registration
-
-# person
-
-
+# ####### persons section #######
 class GetLoginByToken(APIView):
     def get(self, request, key):
         token = get_object_or_404(TokenModel, key=key)
@@ -117,9 +122,8 @@ class GetPersonByUserId(APIView):
         serializers = PersonSerializer(person)
         return Response(serializers.data, status=HTTP_200_OK)
 
-# /end person
 
-# market
+# ####### markets section #######
 class GlobalSearch(APIView):
     def get(self, request, search_word):
         item_result = Item.objects.filter(Q(title__icontains=search_word))
@@ -275,6 +279,15 @@ def remove_one_transaction_of_client(request, client_id, item_id):
     return JsonResponse(serializers.data, status=200)
 
 
+def remove_all_transaction_of_client(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    for t in client.transactions.all():
+        client.transactions.remove(t)
+    client.save()
+    serializers = ClientSerializer(client)
+    return JsonResponse(serializers.data, safe=False)
+
+
 class GetPhysicalItems(ModelViewSet):
     serializer_class = ItemSerializer
     queryset = Item.objects.filter(item_type='phy').order_by('-created')
@@ -307,6 +320,28 @@ class CreateThenAddItemInFactor(APIView):
         if serializers.is_valid():
             serializers.save()
             factor.items.add(serializers.data['id'])
+            return Response(serializers.data, status=HTTP_201_CREATED)
+        return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
+
+    def put(self, request, factor_id):
+        factor = get_object_or_404(Factor, id=factor_id)
+        serializers = ItemSerializer(data=request.data)
+        print(f"request data updated => {request.data}")
+        if serializers.is_valid():
+            serializers.update()
+            factor.items.update(serializers.data['id'])
+            return Response(serializers.data, status=HTTP_201_CREATED)
+        return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
+
+
+class UpdateItemInFactorAPIView(APIView):
+    def put(self, request, factor_id):
+        factor = get_object_or_404(Factor, id=factor_id)
+        serializers = ItemSerializer(data=request.data)
+        print(f"request data updated => {request.data}")
+        if serializers.is_valid():
+            serializers.update()
+            factor.items.update(serializers.data['id'])
             return Response(serializers.data, status=HTTP_201_CREATED)
         return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
 
@@ -352,6 +387,14 @@ class PayCartItems(APIView):
             factor.clients_saved.add(client)
             factor.total_amount += transaction.get_item_total_price()
             person.total_amount -= transaction.get_item_total_price()
+            # notification with transaction
+            notification = Notification.objects.create(
+                message=f"La transaction {transaction.id}, a été effectué avec succès.",
+                transaction=transaction,
+            )
+            notification.save()
+            person.notifications_not_opened.add(notification)
+            factor.notifications_not_opened.add(notification)
             transaction.save()
             factor.save()
         client.save()
@@ -446,7 +489,7 @@ class ListAllRandomItemsByTypeAPIView(APIView):
         all_items = Item.objects.filter(item_type__contains=type_str)
         items_rd = []
         for i in all_items:
-            if(all_items[randrange(len(all_items))]) in items_rd:
+            if (all_items[randrange(len(all_items))]) in items_rd:
                 pass
             else:
                 items_rd.append(all_items[randrange(len(all_items))])
@@ -469,7 +512,6 @@ def get_flux_factors_transactions(request, person_id, flux):
             return JsonResponse(serializers.data, safe=False)
     finally:
         if flux == 'output':
-
             client = get_object_or_404(Client, person_id=person_id)
             transactions = client.transactions_done.order_by('-ordered_date')
             serializers = TransactionSerializer(transactions, many=True)
@@ -507,9 +549,20 @@ def follow_action_client_factor(request, client_id, factor_id):
     serializers = FactorSerializer(factor)
     return JsonResponse(serializers.data, safe=False)
 
-# /end market
 
-# person
+class RegisterNewFactor(APIView):
+    def get(self, request):
+        all_factors = Factor.objects.all()
+        serializers = FactorSerializer(all_factors, many=True)
+        return Response(serializers.data, status=HTTP_200_OK)
+
+    def post(self, request):
+        print(request.data)
+        serializers = FactorSerializer(data=request.data)
+        if serializers.is_valid():
+            serializers.save()
+            return Response(serializers.data, status=HTTP_201_CREATED)
+        return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
 
 
 def deposit_exchange(request, person_id, amount):
@@ -533,12 +586,123 @@ def deposit_exchange(request, person_id, amount):
                 )
             return JsonResponse(serializers.error, status=400, safe=True)
 
-# /end person
+
+# ####### collaborations section #######
+def ask_for_collaboration(request, from_fact_id, to_fact_id):
+    asker_collab = get_object_or_404(Factor, id=from_fact_id)
+    interested_fac = get_object_or_404(Factor, id=to_fact_id)
+    interested_fac.collab_guest.add(asker_collab)
+    interested_fac.save()
+    serializers = FactorSerializer(interested_fac)
+    return JsonResponse(serializers.data, status=200, safe=False)
 
 
-# try
+def accept_a_collaboration(request, asker_fact_id, factor_id):
+    asker_factory = get_object_or_404(Factor, id=asker_fact_id)
+    factor = get_object_or_404(Factor, id=factor_id)
+    factor.collab_guest.remove(asker_factory)
+    factor.collaborators.add(asker_factory)
+    factor.save()
+    serializers = FactorSerializer(factor)
+    return JsonResponse(serializers.data, status=200, safe=False)
 
 
+
+class GetAllCollaborationsFactorAPIView(APIView):
+    def get(self, request, factor_pk):
+        factor = get_object_or_404(Factor, pk=factor_pk)
+        all_collaborations = factor.collaborations.order_by('-collab_date')
+        serializers = CollaborationSerializer(all_collaborations, many=True)
+        return Response(serializers.data, status=HTTP_200_OK)
+
+
+class GetOneCommonCollaborationAPIView(APIView):
+    def get(self, request, owner_id, asker_id):
+        owner_factory = get_object_or_404(Factor, pk=owner_id)
+        asker_factory = get_object_or_404(Factor, pk=asker_id)
+        collaboration = Collaboration.objects.get(Q(factor=owner_factory) and Q(factor=asker_factory))
+        serializers = CollaborationSerializer(collaboration)
+        return Response(serializers.data, status=HTTP_200_OK)
+
+
+class GetTCollabOwnerViewset(ViewSet):
+    def retrieve(self, request, pk=None):
+        collaboration = get_object_or_404(Collaboration, pk=pk)
+        for fac in collaboration.factor_set.filter():
+            if collaboration.factor_asker == fac:
+                pass
+            else:
+
+
+
+# ####### notifications section #######
+def get_all_person_notifications(request, person_id):
+    person = Person.objects.get(id=person_id)
+    if  person.factor_set.first():
+        factor = person.factor_set.first()
+        notifications = Notification.objects.filter(Q(all_person_notifications=person) | Q(notifications_person_not_opened=person) | Q(all_factor_notifications=factor) | Q(notifications_factor_not_opened=factor)).order_by('-pub_date')
+        serializers = NotificationSerializer(notifications, many=True)
+        return JsonResponse(serializers.data, status=200, safe=False)
+    notifications = Notification.objects.filter(Q(all_person_notifications=person) | Q(notifications_person_not_opened=person)).order_by('-pub_date')
+    serializers = NotificationSerializer(notifications, many=True)
+    # print(notifications)
+    return JsonResponse(serializers.data, status=200, safe=False)
+
+
+def get_person_notifications(request, person_id):
+    person = Person.objects.get(id=person_id)
+    if  person.factor_set.first():
+        factor = person.factor_set.first()
+        notifications = Notification.objects.filter(Q(all_person_notifications=person) | Q(all_factor_notifications=factor)).order_by('-pub_date')
+        serializers = NotificationSerializer(notifications, many=True)
+        return JsonResponse(serializers.data, status=200, safe=False)
+    notifications = Notification.objects.filter(all_person_notifications=person).order_by('-pub_date')
+    serializers = NotificationSerializer(notifications, many=True)
+    # print(notifications)
+    return JsonResponse(serializers.data, status=200, safe=False)
+
+
+def get_person_not_opened_notifications(request, person_id):
+    person = Person.objects.get(id=person_id)
+    if  person.factor_set.first():
+        factor = person.factor_set.first()
+        notifications = Notification.objects.filter(Q(notifications_person_not_opened=person) | Q(notifications_factor_not_opened=factor)).order_by('-pub_date')
+        serializers = NotificationSerializer(notifications, many=True)
+        return JsonResponse(serializers.data, status=200, safe=False)
+    notifications = Notification.objects.filter(notifications_person_not_opened=person).order_by('-pub_date')
+    serializers = NotificationSerializer(notifications, many=True)
+    return JsonResponse(serializers.data, status=200, safe=False)
+
+
+def open_person_notification(request, notification_id, person_id):
+    person = get_object_or_404(Person, id=person_id)
+    notification = get_object_or_404(Notification, id=notification_id)
+    person.notifications_not_opened.remove(notification)
+    person.notifications.add(notification)
+    serializers = NotificationSerializer(notification)
+    return JsonResponse(serializers.data, status=200, safe=False)
+
+
+def open_factor_notification(request, notification_id, factor_id):
+    factor = get_object_or_404(Person, id=factor_id)
+    notification = get_object_or_404(Notification, id=notification_id)
+    factor.notifications_not_opened.remove(notification)
+    factor.notifications.add(notification)
+    serializers = NotificationSerializer(notification)
+    return JsonResponse(serializers.data, status=200, safe=False)
+
+
+
+# ####### tries section #######
 class TryModeViewSet(ModelViewSet):
     serializer_class = TrySerializer
     queryset = Try.objects.all()
+
+
+@csrf_exempt
+def add_try(request):
+    if request.method == 'POST':
+        serializers = TrySerializer(data=request.data)
+        print(serializers.data)
+        if serializers.is_valid():
+            print(f"{serializer.data} is ok")

@@ -3,6 +3,7 @@ from .models import *
 from .views import *
 from rest_framework.routers import DefaultRouter
 from django.urls import re_path
+import json
 
 
 router = DefaultRouter()
@@ -17,20 +18,25 @@ router.register('physical_items', GetPhysicalItems, basename="physical_items")
 router.register('virtual_items', GetVirtualItems, basename="virtual_items")
 router.register('tries', TryModeViewSet, basename="tries")
 router.register('users', UserModelViewSet, basename='users')
+router.register('notifications', NotificationViewSet, basename='notifications')
+router.register('collaborations', CollaborationViewSet, basename='collaborations')
+# particulary
+# router.register('get_one_common_collab', GetOneCommonCollaborationViewset, basename='get_one_common_collab')
 
 app_name = 'Teka'
 
 urlpatterns = [
+    # ####### globals viewsets section #######
     path('viewsets/', include(router.urls), name="viewsets"),
     path('viewsets/<int:pk>/', include(router.urls), name="viewsets"),
-    # registration and login
+    # ####### registration and login section #######
     path('register/', RegisterUser.as_view()),
-    # facebook urls
+    # ####### socials networks section #######
     re_path(r'^rest-auth/facebook/$', FacebookLogin.as_view(), name='fb_login'),
-    # person
+    # ####### person section #######
     path('get_login_by_token/<str:key>/', GetLoginByToken.as_view()),
     path('get_person_by_user_id/<int:user_id>/', GetPersonByUserId.as_view()),
-    # market
+    # ####### markets section #######
     path('get_factor_by_person/<int:person_id>/', GetFactorByPerson.as_view()),
     path('get_client_by_person/<int:person_id>/', GetClientByPerson.as_view()),
     path('get_transaction_by_item/<int:item_id>/', GetTransactionByItem.as_view()),
@@ -44,9 +50,11 @@ urlpatterns = [
     path('retrieve_factor_items_search/<int:factor_id>/<str:searched_text>/', RetrieveFactorItemsSearch.as_view()),
     path('create_or_update_client_transaction_by_item/<int:person_id>/<int:item_id>/<int:quantity>/', UpdateOrCreateClientTransactionByItem.as_view()),
     path('remove_one_transaction_of_client/<int:client_id>/<int:item_id>/', remove_one_transaction_of_client),
+    path('remove_all_transaction_of_client/<int:client_id>/', remove_all_transaction_of_client),
     path('get_person_s_factory/<int:person_id>/', get_person_s_factory),
     path('get_item_factor/<int:item_id>/', get_item_factor),
     path('create_then_add_item_in_factor/<int:factor_id>/', CreateThenAddItemInFactor.as_view()),
+    path('update_item_in_factor/<int:factor_id>/', UpdateItemInFactorAPIView.as_view()),
     path('deposit_exchange/<int:person_id>/<int:amount>/', deposit_exchange),
     path('add_person_amount/<int:person_id>/<int:amount>/', add_person_amount),
     path('pay_cart_items/<int:client_id>/', PayCartItems.as_view()),
@@ -61,4 +69,18 @@ urlpatterns = [
     path('get_flux_factors_transactions/<int:person_id>/<str:flux>/', get_flux_factors_transactions),
     path('get_flux_factors_transactions_status/<int:person_id>/<str:flux>/<str:status>/', get_flux_factors_transactions_status),
     path('follow_action_client_factor/<int:client_id>/<int:factor_id>/', follow_action_client_factor),
+    path('register_new_factor/', RegisterNewFactor.as_view()),
+    # ####### collaborations section #######
+    path('ask_for_collaboration/<int:from_fact_id>/<int:to_fact_id>/', ask_for_collaboration),
+    path('accept_a_collaboration/<int:asker_fact_id>/<int:factor_id>/', accept_a_collaboration),
+    path('get_all_collaborations_factor/<int:factor_pk>/', GetAllCollaborationsFactorAPIView.as_view()),
+    path('get_one_common_collab/<int:owner_id>/<int:asker_id>/', GetOneCommonCollaborationAPIView.as_view(),),
+    # ####### notifications section #######
+    path('get_all_person_notifications/<int:person_id>/', get_all_person_notifications),
+    path('get_person_notifications/<int:person_id>/', get_person_notifications),
+    path('get_person_not_opened_notifications/<int:person_id>/', get_person_not_opened_notifications),
+    path('open_person_notification/<int:notification_id>/<int:person_id>/', open_person_notification),
+    path('open_factor_notification/<int:notification_id>/<int:factor_id>/', open_factor_notification),
+    # ####### tries section #######
+    path("add_try/", add_try),
 ]
