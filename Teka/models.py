@@ -161,6 +161,7 @@ class Factor(models.Model):
     collaborations = models.ManyToManyField('Collaboration', blank=True)
     notifications = models.ManyToManyField('Notification', related_name="all_factor_notifications", blank=True)
     notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_factor_not_opened", blank=True)
+    items_collaboration = models.ManyToManyField(Item, related_name='items_to_resell', blank=True)
 
     def __str__(self):
         return f"{self.title} owner by {self.person.user.username}"

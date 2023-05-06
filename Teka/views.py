@@ -625,13 +625,30 @@ class GetOneCommonCollaborationAPIView(APIView):
         return Response(serializers.data, status=HTTP_200_OK)
 
 
-class GetTCollabOwnerViewset(ViewSet):
-    def retrieve(self, request, pk=None):
-        collaboration = get_object_or_404(Collaboration, pk=pk)
+class GetCollabOwnerAPIView(APIView):
+    def get(self, request, collab_pk):
+        collaboration = get_object_or_404(Collaboration, pk=collab_pk)
         for fac in collaboration.factor_set.filter():
             if collaboration.factor_asker == fac:
                 pass
             else:
+                serializers = FactorSerializer(fac)
+                return Response(serializers.data, status=HTTP_200_OK)
+
+
+
+class GetOrAddCollabItemAPIView(APIView):
+    def get(self, request, collaboration_pk, item_pk):
+        collaboration = get_object_or_404(Collaboration, pk=collaboration_pk)
+        collab_item = collaboration.collab_items.get_or_create(item__id=item_pk)
+        factor_asker = collaboration.factor_asker
+        if collab_item[1]:
+            collab_item.save()
+            factor_asker.items_collaboration.add(collab_item.item)
+            factor_asker.save()
+            serializers = CollabItemSerializer(collab_item)
+            return Response(serializers.data, status=HTTP_200_OK)
+        return Response({'':''}, status=HTTP_400_BAD_REQUEST)
 
 
 

@@ -74,7 +74,9 @@ urlpatterns = [
     path('ask_for_collaboration/<int:from_fact_id>/<int:to_fact_id>/', ask_for_collaboration),
     path('accept_a_collaboration/<int:asker_fact_id>/<int:factor_id>/', accept_a_collaboration),
     path('get_all_collaborations_factor/<int:factor_pk>/', GetAllCollaborationsFactorAPIView.as_view()),
+    path('get_collab_owner/<int:collab_pk>/', GetCollabOwnerAPIView.as_view()),
     path('get_one_common_collab/<int:owner_id>/<int:asker_id>/', GetOneCommonCollaborationAPIView.as_view(),),
+    path('get_or_add_collab_item/<int:collaboration_pk>/<int:item_pk>/', GetOrAddCollabItemAPIView.as_view(),),
     # ####### notifications section #######
     path('get_all_person_notifications/<int:person_id>/', get_all_person_notifications),
     path('get_person_notifications/<int:person_id>/', get_person_notifications),
