@@ -28,7 +28,7 @@ app_name = 'Teka'
 
 urlpatterns = [
     # ####### globals section #######
-    path('', global_view),
+    path('/', global_view),
     # ####### globals viewsets section #######
     path('viewsets/', include(router.urls), name="viewsets"),
     path('viewsets/<int:pk>/', include(router.urls), name="viewsets"),
