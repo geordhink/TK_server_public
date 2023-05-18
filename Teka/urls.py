@@ -20,12 +20,15 @@ router.register('tries', TryModeViewSet, basename="tries")
 router.register('users', UserModelViewSet, basename='users')
 router.register('notifications', NotificationViewSet, basename='notifications')
 router.register('collaborations', CollaborationViewSet, basename='collaborations')
+router.register('collab_items', CollabItemViewSet, basename='collab_items')
 # particulary
 # router.register('get_one_common_collab', GetOneCommonCollaborationViewset, basename='get_one_common_collab')
 
 app_name = 'Teka'
 
 urlpatterns = [
+    # ####### globals section #######
+    path('', global_view),
     # ####### globals viewsets section #######
     path('viewsets/', include(router.urls), name="viewsets"),
     path('viewsets/<int:pk>/', include(router.urls), name="viewsets"),

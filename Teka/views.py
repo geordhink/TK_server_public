@@ -1,5 +1,4 @@
 from random import randrange
-
 import django
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -26,7 +25,12 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 
-# # ####### registration and login section #######
+# ######## global section #######
+def global_view(request):
+    return JsonResponse({'etat':'work'}, status=200)
+
+
+# ######## registration and login section #######
 class RegisterUser(APIView):
     def get(self, request):
         all_users = User.objects.all()
@@ -41,7 +45,9 @@ class RegisterUser(APIView):
                 Q(username=serializers.data['username']) |
                 Q(email=serializers.data['email'])
             )
-            person = Person.objects.create(user_id=user.id)
+            p_imo = Profil.objects.get(title='person-imo')
+            person = Person.objects.create(user_id=user.id, profil=p_imo)
+            person.save()
             # client = Client.objects.create(person_id=person.id)
             # print(client)
             token = TokenModel.objects.create(user=user)
@@ -100,6 +106,11 @@ class NotificationViewSet(ModelViewSet):
 class CollaborationViewSet(ModelViewSet):
     serializer_class = CollaborationSerializer
     queryset = Collaboration.objects.order_by('-collab_date')
+
+
+class CollabItemViewSet(ModelViewSet):
+    serializer_class = CollabItemSerializer
+    queryset = CollabItem.objects.all()
 
 
 # ####### social networks registration section #######
@@ -171,7 +182,7 @@ class GetTransactionByItem(APIView):
 class GetClientTransactions(APIView):
     def get(self, request, client_id):
         client = get_object_or_404(Client, id=client_id)
-        all_transactions = client.transactions.all()
+        all_transactions = client.transactions.order_by('-ordered_date')
         serializers = TransactionSerializer(all_transactions, many=True)
         return Response(serializers.data, status=HTTP_200_OK)
 
@@ -591,7 +602,9 @@ def deposit_exchange(request, person_id, amount):
 def ask_for_collaboration(request, from_fact_id, to_fact_id):
     asker_collab = get_object_or_404(Factor, id=from_fact_id)
     interested_fac = get_object_or_404(Factor, id=to_fact_id)
-    interested_fac.collab_guest.add(asker_collab)
+    interested_fac.collab_received.add(asker_collab)
+    asker_collab.collab_asked.add(interested_fac)
+    asker_collab.save()
     interested_fac.save()
     serializers = FactorSerializer(interested_fac)
     return JsonResponse(serializers.data, status=200, safe=False)
@@ -600,9 +613,14 @@ def ask_for_collaboration(request, from_fact_id, to_fact_id):
 def accept_a_collaboration(request, asker_fact_id, factor_id):
     asker_factory = get_object_or_404(Factor, id=asker_fact_id)
     factor = get_object_or_404(Factor, id=factor_id)
-    factor.collab_guest.remove(asker_factory)
+    factor.collab_received.remove(asker_factory)
     factor.collaborators.add(asker_factory)
+    asker_factory.collab_asked.remove(factor)
+    collaboration = Collaboration.objects.create(factor_asker=asker_factory)
+    factor.collaborations.add(collaboration)
+    asker_factory.collaborations.add(collaboration)
     factor.save()
+    asker_factory.save()
     serializers = FactorSerializer(factor)
     return JsonResponse(serializers.data, status=200, safe=False)
 
@@ -620,7 +638,7 @@ class GetOneCommonCollaborationAPIView(APIView):
     def get(self, request, owner_id, asker_id):
         owner_factory = get_object_or_404(Factor, pk=owner_id)
         asker_factory = get_object_or_404(Factor, pk=asker_id)
-        collaboration = Collaboration.objects.get(Q(factor=owner_factory) and Q(factor=asker_factory))
+        collaboration = Collaboration.objects.get(Q(factor=owner_factory) and Q(factor_asker=asker_factory))
         serializers = CollaborationSerializer(collaboration)
         return Response(serializers.data, status=HTTP_200_OK)
 
@@ -640,15 +658,22 @@ class GetCollabOwnerAPIView(APIView):
 class GetOrAddCollabItemAPIView(APIView):
     def get(self, request, collaboration_pk, item_pk):
         collaboration = get_object_or_404(Collaboration, pk=collaboration_pk)
-        collab_item = collaboration.collab_items.get_or_create(item__id=item_pk)
         factor_asker = collaboration.factor_asker
-        if collab_item[1]:
-            collab_item.save()
-            factor_asker.items_collaboration.add(collab_item.item)
-            factor_asker.save()
+        try:
+            collab_item = collaboration.collab_items.get(item__pk=item_pk)
             serializers = CollabItemSerializer(collab_item)
             return Response(serializers.data, status=HTTP_200_OK)
-        return Response({'':''}, status=HTTP_400_BAD_REQUEST)
+        except:
+            item = get_object_or_404(Item, pk=item_pk)
+            collab_item = collaboration.collab_items.create(item=item)
+            collab_item.save()
+            if collab_item.item in factor_asker.items_collaboration.all():
+                pass
+            else:
+                factor_asker.items_collaboration.add(collab_item.item.id)
+            factor_asker.save()
+            serializers = CollabItemSerializer(collab_item)
+            return Response(serializers.data, status=HTTP_201_CREATED)
 
 
 

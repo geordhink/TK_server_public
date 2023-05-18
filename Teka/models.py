@@ -79,7 +79,10 @@ class Person(models.Model):
 
 
 class Profil(models.Model):
+    title = models.CharField(max_length=255,default='imo')
     file_name = models.ImageField(upload_to='profils/%Y/%m/%d/')
+    def __str__(self):
+        return f"{self.title} {self.id}"
 
 
 class Media(models.Model):
@@ -207,11 +210,11 @@ class Collaboration(models.Model):
 class CollabItem(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE)
     price_collab = models.FloatField(blank=True, null=True)
-    stock_collab = models.IntegerField(blank=True, null=True)
+    nb_sales = models.IntegerField(default=0)
     percent_item = models.FloatField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.stock_collab} {self.item.title} in stock at {self.price_collab}"
+        return f"{self.nb_sales} {self.item.title} sales at {self.price_collab}"
 
 
 
