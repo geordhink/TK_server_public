@@ -27,7 +27,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 # ######## global section #######
 def global_view(request):
-    return JsonResponse({'etat':'work'}, status=200)
+    return JsonResponse({'state':'work'}, status=200)
 
 
 # ######## registration and login section #######
@@ -111,6 +111,10 @@ class CollaborationViewSet(ModelViewSet):
 class CollabItemViewSet(ModelViewSet):
     serializer_class = CollabItemSerializer
     queryset = CollabItem.objects.all()
+
+class CommentViewSet(ModelViewSet):
+    serializer_class = CommentSerializer
+    queryset = Comment.objects.order_by('-pub_date')
 
 
 # ####### social networks registration section #######
@@ -720,20 +724,49 @@ def open_person_notification(request, notification_id, person_id):
     person = get_object_or_404(Person, id=person_id)
     notification = get_object_or_404(Notification, id=notification_id)
     person.notifications_not_opened.remove(notification)
-    person.notifications.add(notification)
+    if notification in person.notifications.all():
+        pass
+    else:
+        person.notifications.add(notification)
     serializers = NotificationSerializer(notification)
     return JsonResponse(serializers.data, status=200, safe=False)
 
 
 def open_factor_notification(request, notification_id, factor_id):
-    factor = get_object_or_404(Person, id=factor_id)
+    factor = get_object_or_404(Factor, id=factor_id)
     notification = get_object_or_404(Notification, id=notification_id)
     factor.notifications_not_opened.remove(notification)
-    factor.notifications.add(notification)
+    if notification in factor.notifications.all():
+        pass
+    else:
+        factor.notifications.add(notification)
     serializers = NotificationSerializer(notification)
     return JsonResponse(serializers.data, status=200, safe=False)
 
 
+
+# ####### Comments section #######
+class GetAllItemCommentsAPIView(APIView):
+    def get(self, request, item_pk):
+        comments = Comment.objects.filter(item__pk=item_pk).order_by('pub_date')
+        serializers = CommentSerializer(comments, many=True)
+        return Response(serializers.data, status=HTTP_200_OK)
+
+class PostItemComment(APIView):
+    def get(self, request, item_pk, person_pk):
+        try:
+            comment = Comment.objects.get(person__pk=person_pk, item__pk=item_pk)
+            serializers = CommentSerializer(comment)
+            return Response(serializers.data, status=HTTP_200_OK)
+        except:
+            return Response(status=HTTP_404_NOT_FOUND)
+    def post(self, request):
+        serializers = CommentSerializer(data=request.data)
+        if serializers.is_valid():
+            serializers.save()
+            return Response(serializers.data, status=HTTP_201_CREATED)
+        else:
+            return Response(serializers.errors, status=HTTP_400_BAD_REQUEST)
 
 # ####### tries section #######
 class TryModeViewSet(ModelViewSet):

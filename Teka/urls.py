@@ -21,6 +21,7 @@ router.register('users', UserModelViewSet, basename='users')
 router.register('notifications', NotificationViewSet, basename='notifications')
 router.register('collaborations', CollaborationViewSet, basename='collaborations')
 router.register('collab_items', CollabItemViewSet, basename='collab_items')
+router.register('comments', CommentViewSet, basename='comments')
 # particulary
 # router.register('get_one_common_collab', GetOneCommonCollaborationViewset, basename='get_one_common_collab')
 
@@ -86,6 +87,10 @@ urlpatterns = [
     path('get_person_not_opened_notifications/<int:person_id>/', get_person_not_opened_notifications),
     path('open_person_notification/<int:notification_id>/<int:person_id>/', open_person_notification),
     path('open_factor_notification/<int:notification_id>/<int:factor_id>/', open_factor_notification),
+    # ####### Comments section #######
+    path('get_all_item_comments/<int:item_pk>/', GetAllItemCommentsAPIView.as_view()),
+    path('post_item_comment/<int:item_pk>/<int:person_pk>/', PostItemComment.as_view()),
+
     # ####### tries section #######
     path("add_try/", add_try),
 ]

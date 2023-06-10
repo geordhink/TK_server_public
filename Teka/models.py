@@ -231,6 +231,18 @@ class Notification(models.Model):
         return f"'{self.message}' sent at {self.pub_date} with transaction: {self.transaction} and item: {self.item}"
 
 
+# ####### Comments section #######
+class Comment(models.Model):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE)
+    item =  models.ForeignKey(Item, on_delete=models.CASCADE)
+    content = models.TextField()
+    pub_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.item.title} is comment by {self.person.user.username} at {self.pub_date}"
+
+
+
 # ####### Tries section #######
 class Try(models.Model):
     title = models.CharField(max_length=255)

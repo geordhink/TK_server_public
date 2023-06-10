@@ -77,8 +77,14 @@ class CollabItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = "__all__"
+
 class TrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Try
         fields = "__all__"
+
 
