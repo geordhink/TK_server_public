@@ -22,6 +22,8 @@ router.register('notifications', NotificationViewSet, basename='notifications')
 router.register('collaborations', CollaborationViewSet, basename='collaborations')
 router.register('collab_items', CollabItemViewSet, basename='collab_items')
 router.register('comments', CommentViewSet, basename='comments')
+# router.register('person-pic', ChangePersonImageViewSets, basename='person-pic')
+# router.register('factor-pic', ChangePersonImageViewSets, basename='factor-pic')
 # particulary
 # router.register('get_one_common_collab', GetOneCommonCollaborationViewset, basename='get_one_common_collab')
 
@@ -30,6 +32,7 @@ app_name = 'Teka'
 urlpatterns = [
     # ####### globals section #######
     path('', global_view),
+    path('change_picture/<int:person_id>/<int:factor_id>/', change_picture, name='change_picture'),
     # ####### globals viewsets section #######
     path('viewsets/', include(router.urls), name="viewsets"),
     path('viewsets/<int:pk>/', include(router.urls), name="viewsets"),
@@ -52,6 +55,7 @@ urlpatterns = [
     path('get_last_created_items/', GetLastCreatedItems.as_view()),
     path('global_search/<str:search_word>/', GlobalSearch.as_view()),
     path('retrieve_factor_items_search/<int:factor_id>/<str:searched_text>/', RetrieveFactorItemsSearch.as_view()),
+    path('retrieve_factors_search/<str:searched_text>/', RetrieveFactorSearch.as_view()),
     path('create_or_update_client_transaction_by_item/<int:person_id>/<int:item_id>/<int:quantity>/', UpdateOrCreateClientTransactionByItem.as_view()),
     path('remove_one_transaction_of_client/<int:client_id>/<int:item_id>/', remove_one_transaction_of_client),
     path('remove_all_transaction_of_client/<int:client_id>/', remove_all_transaction_of_client),

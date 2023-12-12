@@ -15,7 +15,6 @@ class PersonSerializer(CountryFieldMixin, serializers.ModelSerializer):
         model = Person
         fields = "__all__"
 
-
 class ProfilSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profil
@@ -26,6 +25,18 @@ class MediaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Media
         fields = "__all__"
+
+
+class MiniPersonPicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = ['id', 'profil']
+
+
+class MiniFactorPicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Factor
+        fields = ['id', 'profil']
 
         
 class ItemSerializer(serializers.ModelSerializer):

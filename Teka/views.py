@@ -9,6 +9,8 @@ from rest_framework.viewsets import *
 from rest_framework.response import Response
 from rest_framework.status import *
 from rest_framework.views import APIView
+from rest_framework.parsers import JSONParser
+from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication, TokenAuthentication
 from django.shortcuts import get_object_or_404
@@ -28,6 +30,39 @@ from django.views.decorators.csrf import csrf_exempt
 # ######## global section #######
 def global_view(request):
     return JsonResponse({'state':'work'}, status=200)
+
+@csrf_exempt
+@api_view(['GET', 'POST', 'PUT'])
+def change_picture(request, person_id, factor_id):
+    if person_id != 0:
+        person = get_object_or_404(Person, id=person_id)
+        if request.method == 'GET':
+            serializers = MiniPersonPicSerializer(person)
+            return JsonResponse(serializers.data, status=200, safe=False)
+        if request.method == 'PUT':
+            data = JSONParser().parse(request)
+            serializers = MiniPersonPicSerializer(person, data=data)
+            if serializers.is_valid():
+                serializers.save()
+                return JsonResponse(serializers.data, status=201, safe=False)
+            return JsonResponse(serializers.errors, status=400)
+    elif factor_id != 0:
+        factor = get_object_or_404(Factor, id=factor_id)
+        if request.method == 'GET':
+            serializers = MiniFactorPicSerializer(factor)
+            return JsonResponse(serializers.data, status=200, safe=False)
+        if request.method == 'PUT':
+            data=JSONParser().parse(request)
+            serializers = MiniFactorPicSerializer(factor, data=data)
+            if serializers.is_valid():
+                serializers.save()
+                print(f"Factor {factor}, with profil {factor.profil}")
+                return JsonResponse(serializers.data, status=201, safe=False)
+            return JsonResponse(serializers.errors, status=400)
+    else:
+        return JsonResponse(status=404)
+
+
 
 
 # ######## registration and login section #######
@@ -60,6 +95,8 @@ class RegisterUser(APIView):
 class PersonsViewSet(ModelViewSet):
     serializer_class = PersonSerializer
     queryset = Person.objects.all()
+    # permission_classes = [IsAuthenticated]
+    # authentication_classes = [SessionAuthentication, BasicAuthentication, TokenAuthentication]
 
 
 class ProfilViewSet(ModelViewSet):
@@ -116,6 +153,14 @@ class CommentViewSet(ModelViewSet):
     serializer_class = CommentSerializer
     queryset = Comment.objects.order_by('-pub_date')
 
+# class ChangePersonImageViewSets(ModelViewSet):
+#     serializer_class = MiniPersonPicSerializer
+#     queryset =  Person.objects.all()
+#
+# class ChangePersonImageViewSets(ModelViewSet):
+#     serializer_class = MiniFactorPicSerializer
+#     queryset =  Factor.objects.all()
+
 
 # ####### social networks registration section #######
 class FacebookLogin(SocialLoginView):
@@ -141,8 +186,21 @@ class GetPersonByUserId(APIView):
 # ####### markets section #######
 class GlobalSearch(APIView):
     def get(self, request, search_word):
-        item_result = Item.objects.filter(Q(title__icontains=search_word))
-        factor_result = Factor.objects.filter(Q(title__icontains=search_word))
+        s_word = search_word
+        if s_word.startswith('^'):
+            word = s_word.strip('^')[:3]
+            item_result = Item.objects.filter(Q(item_category__icontains=word) | Q(item_type__icontains=word))
+        elif s_word == '~0':
+            item_result = Item.objects.order_by('-created')
+        elif s_word.startswith('<'):
+            price = int(s_word.strip('<'))
+            item_result = Item.objects.filter(Q(price__lte=price) | Q(discount_price__lte=price)).order_by('price' or 'discount_price')
+        elif s_word.startswith('>'):
+            price = int(s_word.strip('>'))
+            item_result = Item.objects.filter(Q(price__gte=price) | Q(discount_price__gte=price)).order_by('price' or 'discount_price')
+        else:
+            item_result = Item.objects.filter(Q(title__icontains=search_word))
+            factor_result = Factor.objects.filter(Q(title__icontains=search_word))
         if item_result:
             serializers = ItemSerializer(item_result, many=True)
             return Response(serializers.data, status=HTTP_200_OK)
@@ -150,12 +208,18 @@ class GlobalSearch(APIView):
             serializers = FactorSerializer(factor_result, many=True)
             return Response(serializers.data, status=HTTP_200_OK)
 
-
 class RetrieveFactorItemsSearch(APIView):
     def get(self, request, factor_id, searched_text):
         factor = get_object_or_404(Factor, id=factor_id)
         items = factor.items.filter(title__contains=searched_text)
         serializers = ItemSerializer(items, many=True)
+        return Response(serializers.data, status=HTTP_200_OK)
+
+
+class RetrieveFactorSearch(APIView):
+    def get(self, request, searched_text):
+        factors = Factor.objects.filter(Q(title__contains=searched_text) | Q(description__icontains=searched_text))
+        serializers = FactorSerializer(factors, many=True)
         return Response(serializers.data, status=HTTP_200_OK)
 
 
