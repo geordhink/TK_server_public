@@ -15,6 +15,12 @@ class PersonSerializer(CountryFieldMixin, serializers.ModelSerializer):
         model = Person
         fields = "__all__"
 
+
+class PersonUpdateSerializer(CountryFieldMixin, serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = [ 'email', 'country']
+
 class ProfilSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profil
@@ -92,6 +98,13 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = "__all__"
+
+
+class BestClientSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    total_spent = serializers.IntegerField()
+    transactions_count = serializers.IntegerField()
+
 
 class TrySerializer(serializers.ModelSerializer):
     class Meta:

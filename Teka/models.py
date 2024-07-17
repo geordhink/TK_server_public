@@ -18,12 +18,10 @@ ITEM_TYPE = (
     ('vir', 'virtual'),
 )
 
-
 ITEM_STATE = (
     ('nw', 'New'),
     ('ud', 'Used'),
 )
-
 
 STATUS_TYPE = (
     ('I', 'Initial'),
@@ -44,6 +42,11 @@ ITEM_CATEGORY = (
     ('coo', 'Cook'),
     ('spo', 'Sport'),
     ('inf', 'Information'),
+)
+ITEM_CURRENCY = (
+    ('xaf', 'francs CFA'),
+    ('eur', 'euros'),
+    ('usd', 'dollars'),
 )
 
 PAYEMENT_METHOD = (
@@ -68,7 +71,9 @@ class Person(models.Model):
     total_amount = models.IntegerField(default=0)
     country = CountryField(blank=True)
     notifications = models.ManyToManyField('Notification', related_name="all_person_notifications", blank=True)
-    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_person_not_opened", blank=True)
+    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_person_not_opened",
+                                                      blank=True)
+    favorite_currency = models.CharField(max_length=3, choices=ITEM_CURRENCY, default='eur')
 
     def __str__(self):
         return self.user.username
@@ -79,19 +84,19 @@ class Person(models.Model):
 
 
 class Profil(models.Model):
-    title = models.CharField(max_length=255,default='imo')
+    title = models.CharField(max_length=255, default='imo')
     file_name = models.ImageField(upload_to='profils/%Y/%m/%d/')
+
     def __str__(self):
         return f"{self.title} {self.id}"
 
 
 class Media(models.Model):
     file_name = models.FileField(upload_to='medias/%Y/%m/%d/')
-    type_file = models.CharField(max_length=3, choices=MEDIA_TYPE)
+    # type_file = models.CharField(max_length=3, choices=MEDIA_TYPE, )
 
     def __str__(self):
         return f"{self.file_name}"
-
 
 
 # ####### Markets section #######
@@ -101,17 +106,19 @@ class Item(models.Model):
     description = models.TextField(blank=True, null=True)
     item_type = models.CharField(max_length=4, choices=ITEM_TYPE)
     item_category = models.CharField(max_length=3, choices=ITEM_CATEGORY)
-    media = models.ForeignKey(Media, on_delete=models.CASCADE, blank=True, null=True)
-    price = models.IntegerField()
-    discount_price = models.IntegerField(blank=True, null=True)
-    rate = models.IntegerField(blank=True, default=0)
+    item_currency = models.CharField(max_length=3, choices=ITEM_CURRENCY, default='eur')
+    medias = models.ManyToManyField(Media, blank=True, null=True, max_length=5)
+    price = models.FloatField()
+    discount_price = models.FloatField(blank=True, null=True)
+    rate = models.FloatField(blank=True, default=0)
     created = models.DateTimeField(auto_now_add=True)
     stock = models.IntegerField(default=1)
     item_state = models.CharField(max_length=2, choices=ITEM_STATE, default='nw')
     resellable = models.BooleanField(default=False)
+    likers = models.ManyToManyField(Person, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.title} created at {self.created}"
+        return f"{self.title} created at {self.created} with {self.likers.count()} liker(s)"
 
 
 class Transaction(models.Model):
@@ -163,8 +170,14 @@ class Factor(models.Model):
     collaborators = models.ManyToManyField('Factor', related_name='own_collaborators', blank=True)
     collaborations = models.ManyToManyField('Collaboration', blank=True)
     notifications = models.ManyToManyField('Notification', related_name="all_factor_notifications", blank=True)
-    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_factor_not_opened", blank=True)
+    notifications_not_opened = models.ManyToManyField('Notification', related_name="notifications_factor_not_opened",
+                                                      blank=True)
     items_collaboration = models.ManyToManyField(Item, related_name='items_to_resell', blank=True)
+    welcome_message = models.CharField(max_length=400, blank=True, null=True)
+    new_item_message = models.CharField(max_length=400, default="Nouveau produit rien que pour vous !")
+    # localzation
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.title} owner by {self.person.user.username}"
@@ -182,6 +195,9 @@ class Client(models.Model):
     payment_method = models.CharField(max_length=3, choices=PAYEMENT_METHOD)
     billing_address = models.CharField(max_length=255, blank=True, null=True)
     shipping_address = models.CharField(max_length=255, blank=True, null=True)
+    # localzation
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.person.user.username} with {self.transactions.count()} transactions and {self.transactions_done.count()} transactions finished"
@@ -193,6 +209,20 @@ class Client(models.Model):
         print(f"{self.transactions.count()} item(s) for all gives {total} Fcfa")
         return total
 
+
+class Category(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+class SubCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    category = models.ForeignKey(Category, related_name="subcategories", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.name} of {self.category.name} category"
 
 
 # ####### collaborations section #######
@@ -217,7 +247,6 @@ class CollabItem(models.Model):
         return f"{self.nb_sales} {self.item.title} sales at {self.price_collab}"
 
 
-
 # ####### Notifications section #######
 class Notification(models.Model):
     message = models.TextField()
@@ -226,6 +255,7 @@ class Notification(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, blank=True, null=True)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, blank=True, null=True)
     factor = models.ForeignKey(Factor, on_delete=models.CASCADE, blank=True, null=True)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, blank=True, null=True)
 
     def __str__(self):
         return f"'{self.message}' sent at {self.pub_date} with transaction: {self.transaction} and item: {self.item}"
@@ -234,13 +264,12 @@ class Notification(models.Model):
 # ####### Comments section #######
 class Comment(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE)
-    item =  models.ForeignKey(Item, on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
     content = models.TextField()
     pub_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.item.title} is comment by {self.person.user.username} at {self.pub_date}"
-
 
 
 # ####### Tries section #######
